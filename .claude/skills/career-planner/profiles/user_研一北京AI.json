@@ -1,0 +1,55 @@
+{
+  "profile_id": "user_研一北京AI",
+  "created_at": "2026-02-28",
+  "target_role": ["Agent开发工程师", "RAG工程师"],
+  "target_city": "北京",
+  "remote_ok": false,
+  "experience_years": 0,
+  "education": "硕士在读",
+  "graduation_year": 2027,
+  "semester": "研一下学期",
+  "current_skills": {
+    "programming": ["Python", "Java"],
+    "ml_dl": ["机器学习基础", "深度学习基础", "神经网络", "决策树"],
+    "frameworks": ["PyTorch基础"],
+    "tools": ["Linux基础", "Git基础"],
+    "agent_frameworks": ["LangChain基础"],
+    "other": ["JavaWeb学了一半"]
+  },
+  "target_salary_min_k": 15,
+  "target_salary_max_k": 25,
+  "weekly_study_hours": 20,
+  "timeline_months": 12,
+  "goal": "暑期实习",
+  "timeline": {
+    " internship_target": "2025年6月",
+    "current_date": "2025年3月初",
+    "weeks_until_internship": 12
+  },
+  "gap_analysis": {
+    "high_priority": [
+      "LangChain核心组件深入(LCEL, Chain, Agent, Tool)",
+      "RAG完整技术栈(向量数据库、chunk策略、召回优化)",
+      "Agent项目实战1-2个",
+      "LeetCode算法题200+"
+    ],
+    "medium_priority": [
+      "LangGraph(状态流/工作流)",
+      "多模态RAG",
+      "LLM API调用(GPT/Claude/国产模型)",
+      "部署经验(Docker/云服务)"
+    ],
+    "low_priority": [
+      "论文/顶会",
+      "开源贡献"
+    ]
+  },
+  "plan_summary": {
+    "phase_1": "3月：基础巩固+项目启动，60题LeetCode",
+    "phase_2": "4月：项目收尾+简历投递，130题LeetCode",
+    "phase_3": "5月：面试冲刺+持续投递",
+    "phase_4": "6月：实习入职"
+  },
+  "market_data_source": "references/market-data-2026-02.md",
+  "plan_template": "references/internship-sprint-plan.md"
+}
