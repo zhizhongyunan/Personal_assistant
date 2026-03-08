@@ -2,7 +2,15 @@
   "permissions": {
     "allow": [
       "mcp__context7__query-docs",
-      "mcp__context7__resolve-library-id"
+      "mcp__context7__resolve-library-id",
+      "WebFetch(domain:python.langchain.com)",
+      "WebSearch",
+      "Bash(pip show:*)",
+      "mcp__fetch__fetch",
+      "mcp__tavily-search__tavily_search",
+      "mcp__tavily-search__tavily_extract",
+      "mcp__firecrawl__firecrawl_scrape",
+      "mcp__firecrawl__firecrawl_map"
     ]
   }
 }
