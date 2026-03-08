@@ -1,105 +1,104 @@
-# AI Agent 开发 4 个月学习计划
+# AI Agent 开发 4 个月学习计划 (LangChain 1.0+ 版本)
 
 > 目标：2026 年 7 月找到 AI Agent 开发实习
-> 当前：2026 年 3 月 5 日，研一下学期
+> 当前：2026 年 3 月 8 日，研一下学期
+> **重要更新**：本计划已适配 LangChain 1.0+ 版本
 
 ---
 
-## 📊 个人 SWOT 分析
+## 📊 已学习内容（Week 1-2）
 
-| 优势 (Strengths) | 劣势 (Weaknesses) |
-|-----------------|-------------------|
-| ✅ 科班出身，基础扎实 | ❌ 无实际项目经验 |
-| ✅ 研一时间相对充裕 | ❌ 缺乏工程化经验 |
-| ✅ 已开始学习 LangChain | ❌ RAG/向量数据库未接触 |
-| ✅ 学习意愿强 | ❌ 无 GitHub 开源项目 |
+### Week 1: 异步编程 + Agent 基础 ✅
+- [x] async/await 异步编程
+- [x] `create_agent` (✅ LangChain 1.0 新 API)
+- [x] `@tool` 装饰器定义工具
+- [x] `ToolRuntime` 运行时上下文
+- [x] `context_schema` 上下文类型定义
+- [x] `InMemorySaver` 状态持久化
+- [x] 信号量控制并发
 
-| 机会 (Opportunities) | 威胁 (Threats) |
-|---------------------|----------------|
-| 🎯 AI Agent 人才需求旺盛 | ⚠️ 竞争激烈（985/211 扎堆） |
-| 🎯 实习门槛相对校招低 | ⚠️ 技术更新快 |
-| 🎯 可远程实习 | ⚠️ 时间只有 4 个月 |
+### Week 2: Prompt + Output Parser ✅
+- [x] `ChatPromptTemplate` 聊天提示词
+- [x] `MessagesPlaceholder` 动态历史消息
+- [x] `FewShotChatMessagePromptTemplate` 示例提示
+- [x] `StrOutputParser` 字符串输出
+- [x] `JsonOutputParser` JSON 输出
+- [x] `PydanticOutputParser` Pydantic 模型输出 (⚠️ 1.0 推荐用 `with_structured_output`)
 
 ---
 
-## 🗓️ 详细周计划
+## ⚠️ LangChain 1.0 重要变化（必须知道）
 
-### 第 1 周（3.5 - 3.11）：Python 异步与 LangChain 基础
-
-**学习目标**：
-- 理解 async/await 工作原理
-- 掌握 LangChain ChatModel 调用
-- 能编写异步 LLM 应用
-
-**每日任务**：
-
-| 日期 | 任务 | 预计耗时 | 完成打勾 |
-|------|------|----------|----------|
-| 周一 | async/await 基础语法 | 2h | [ ] |
-| 周二 | aiohttp 异步 HTTP 请求 | 2h | [ ] |
-| 周三 | LangChain ChatModel 同步调用复习 | 1h | [ ] |
-| 周四 | LangChain ChatModel 异步调用 | 2h | [ ] |
-| 周五 | 实践：异步批量处理请求 | 2h | [ ] |
-| 周六 | 整合 Demo：异步对话系统 | 3h | [ ] |
-| 周日 | 整理笔记 + 复盘 | 2h | [ ] |
-
-**代码练习**：
+### 包结构变化
 ```python
-# 练习 1：基础异步
-async def basic_async():
-    pass
+# 旧版本 (0.x)
+from langchain.chains import LLMChain
+from langchain.agents import initialize_agent
 
-# 练习 2：异步 LLM 调用
-async def invoke_llm_async():
-    pass
+# 新版本 (1.0) - 核心
+from langchain.agents import create_agent  # 主推方式
+from langchain.agents.structured_output import ToolStrategy, ProviderStrategy
 
-# 练习 3：批量异步请求
-async def batch_invoke():
-    pass
+# 旧代码移到 langchain-classic
+from langchain_classic.chains import LLMChain  # 向后兼容
 ```
 
-**检查点**：
-- [ ] 能解释 async/await 原理
-- [ ] 独立完成异步 LLM 调用
-- [ ] 理解 asyncio.gather 用法
+### Agent 创建变化
+```python
+# 旧版本 (0.2-0.3)
+from langgraph.prebuilt import create_react_agent
+
+# 新版本 (1.0+) ✅ 推荐
+from langchain.agents import create_agent
+```
+
+### 结构化输出变化
+```python
+# 旧版本 - 使用 PydanticOutputParser
+from langchain_core.output_parsers import PydanticOutputParser
+parser = PydanticOutputParser(pydantic_object=Person)
+format_instructions = parser.get_format_instructions()  # ⚠️ 已废弃
+
+# 新版本 (1.0+) ✅ 推荐
+from pydantic import BaseModel
+class Person(BaseModel):
+    name: str
+    
+# 方式1: with_structured_output (推荐)
+model = ChatOpenAI(model="gpt-4")
+structured_model = model.with_structured_output(Person)
+result = structured_model.invoke("创建一个人")
+
+# 方式2: create_agent 中的 response_format
+from langchain.agents.structured_output import ToolStrategy
+agent = create_agent(
+    model=model,
+    tools=tools,
+    response_format=ToolStrategy(Person)  # 强制结构化输出
+)
+```
+
+### 新增核心概念
+1. **Middleware (中间件)**：可插拔的定制化扩展
+2. **Content Blocks**：统一的内容类型表示
+3. **Model Profiles**：模型能力描述
+4. **Python 3.10+**：不再支持 3.9
 
 ---
 
-### 第 2 周（3.12 - 3.18）：Prompt 与 Memory
+## 🗓️ 详细周计划（更新版）
 
-**学习目标**：
-- 掌握 PromptTemplate 高级用法
-- 理解 Output Parser
-- 实现对话记忆功能
+### 第 1 周（3.5 - 3.11）：Python 异步与 LangChain 基础 ✅ 已完成
 
-**每日任务**：
+**检查点**：✅ 已使用 LangChain 1.0 的 `create_agent`
 
-| 日期 | 任务 | 预计耗时 | 完成打勾 |
-|------|------|----------|----------|
-| 周一 | PromptTemplate 基础 | 1h | [ ] |
-| 周二 | FewShotPromptTemplate | 2h | [ ] |
-| 周三 | Output Parser 详解 | 2h | [ ] |
-| 周四 | ConversationBufferMemory | 2h | [ ] |
-| 周五 | ConversationBufferWindowMemory | 2h | [ ] |
-| 周六 | 实践：带记忆的对话机器人 | 3h | [ ] |
-| 周日 | 整理笔记 + 复盘 | 2h | [ ] |
+---
 
-**代码练习**：
-```python
-# 练习 1：FewShot 示例
-from langchain.prompts import FewShotPromptTemplate
+### 第 2 周（3.12 - 3.18）：Prompt 与 Memory ⚠️ 部分过时需更新
 
-# 练习 2：Output Parser
-from langchain.output_parsers import PydanticOutputParser
-
-# 练习 3：Memory 集成
-from langchain.memory import ConversationBufferMemory
-```
-
-**检查点**：
-- [ ] 能设计 FewShot Prompt
-- [ ] 实现结构化输出解析
-- [ ] 对话机器人能记住历史
+**更新内容**：
+- [ ] Output Parser 部分更新为 `with_structured_output`
+- [ ] 添加 ProviderStrategy/ToolStrategy 讲解
 
 ---
 
@@ -107,7 +106,7 @@ from langchain.memory import ConversationBufferMemory
 
 **学习目标**：
 - 理解 Embedding 原理
-- 掌握 Chroma 向量数据库
+- 掌握 Chroma/LangChain 1.0 向量存储
 - 实现文档向量化存储
 
 **每日任务**：
@@ -115,28 +114,40 @@ from langchain.memory import ConversationBufferMemory
 | 日期 | 任务 | 预计耗时 | 完成打勾 |
 |------|------|----------|----------|
 | 周一 | Embedding 原理学习 | 2h | [ ] |
-| 周二 | Chroma 安装与基础使用 | 2h | [ ] |
+| 周二 | Chroma 1.0 安装与基础使用 | 2h | [ ] |
 | 周三 | 文本分块策略（Chunking） | 2h | [ ] |
 | 周四 | 文档加载与分块实践 | 2h | [ ] |
 | 周五 | 向量化存储完整流程 | 3h | [ ] |
 | 周六 | 实践：个人笔记知识库 | 4h | [ ] |
 | 周日 | 整理笔记 + 复盘 | 2h | [ ] |
 
-**代码练习**：
+**代码练习（LangChain 1.0）**：
 ```python
-# 练习 1：Chroma 基础
+# 1.0 版本向量存储
 from langchain_chroma import Chroma
-
-# 练习 2：文本分块
+from langchain_openai import OpenAIEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-
-# 练习 3：文档加载
 from langchain_community.document_loaders import TextLoader
+
+# 加载文档
+loader = TextLoader("docs.txt")
+docs = loader.load()
+
+# 分块
+splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
+splits = splitter.split_documents(docs)
+
+# 向量化存储
+embeddings = OpenAIEmbeddings()
+vectorstore = Chroma.from_documents(documents=splits, embedding=embeddings)
+
+# 检索
+retriever = vectorstore.as_retriever(search_kwargs={"k": 3})
 ```
 
 **检查点**：
 - [ ] 理解余弦相似度计算
-- [ ] 能完成文档向量化入库
+- [ ] 能完成文档向量化入库 (Chroma 1.0)
 - [ ] 实现基础向量检索
 
 ---
@@ -160,18 +171,6 @@ from langchain_community.document_loaders import TextLoader
 | 周六 | 实践：文档问答系统 | 4h | [ ] |
 | 周日 | 整理笔记 + 复盘 | 2h | [ ] |
 
-**代码练习**：
-```python
-# 练习 1：Retriever 配置
-retriever = vectorstore.as_retriever(search_kwargs={"k": 5})
-
-# 练习 2：多路召回
-from langchain.retrievers import EnsembleRetriever
-
-# 练习 3：Rerank
-from langchain.retrievers.document_compressors import CrossEncoderReranker
-```
-
 **检查点**：
 - [ ] 理解检索召回率概念
 - [ ] 能配置多路召回
@@ -188,29 +187,12 @@ from langchain.retrievers.document_compressors import CrossEncoderReranker
 - [ ] PDF 论文问答系统
 - [ ] 技术文档智能助手
 
-**本周任务**：
-
-| 日期 | 任务 | 预计耗时 |
-|------|------|----------|
-| 周一 | 项目设计与技术选型 | 2h |
-| 周二 | 文档加载模块 | 2h |
-| 周三 | 向量化存储模块 | 2h |
-| 周四 | 检索模块优化 | 3h |
-| 周五 | 问答接口实现 | 2h |
-| 周六 | 前端界面（可选） | 4h |
-| 周日 | 文档整理 + GitHub 上传 | 3h |
-
-**交付物**：
-- [ ] 完整可运行代码
-- [ ] README 文档
-- [ ] 演示视频（可选）
-
 ---
 
-### 第 6 周（4.9 - 4.15）：自定义 Tool 开发
+### 第 6 周（4.9 - 4.15）：自定义 Tool 开发 (LangChain 1.0)
 
 **学习目标**：
-- 深入理解 Tool 定义
+- 深入理解 Tool 定义（1.0 新API）
 - 能封装任意函数为 Tool
 - 掌握 Tool 注册与发现
 
@@ -226,17 +208,30 @@ from langchain.retrievers.document_compressors import CrossEncoderReranker
 | 周六 | Tool 库整合 | 3h | [ ] |
 | 周日 | 整理笔记 + 复盘 | 2h | [ ] |
 
+**1.0 新增 Tool 概念**：
+```python
+# LangChain 1.0 Tool 定义
+from langchain.tools import tool
+
+@tool
+def calculate(a: int, b: int, operation: str = "add") -> int:
+    """执行数学计算
+    
+    Args:
+        a: 第一个数字
+        b: 第二个数字
+        operation: 操作类型，add/subtract/multiply/divide
+    """
+    operations = {"add": a + b, "subtract": a - b, "multiply": a * b, "divide": a / b}
+    return operations.get(operation, a + b)
+```
+
 **工具实践清单**：
 - [ ] 天气查询工具
 - [ ] 计算器工具
 - [ ] 数据库查询工具
 - [ ] 文件处理工具
 - [ ] API 调用工具
-
-**检查点**：
-- [ ] 能封装任意 Python 函数
-- [ ] 理解 Tool 描述的重要性
-- [ ] 工具调用准确率>90%
 
 ---
 
@@ -259,25 +254,6 @@ from langchain.retrievers.document_compressors import CrossEncoderReranker
 | 周六 | 实践：多步骤任务流 | 4h | [ ] |
 | 周日 | 整理笔记 + 复盘 | 2h | [ ] |
 
-**代码练习**：
-```python
-from langgraph.graph import StateGraph, END
-
-# 定义状态
-class State(TypedDict):
-    messages: Annotated[list, add_messages]
-
-# 创建图
-graph = StateGraph(State)
-graph.add_node("agent", agent_node)
-graph.add_edge("agent", END)
-```
-
-**检查点**：
-- [ ] 理解状态传递机制
-- [ ] 能设计多节点工作流
-- [ ] 实现条件分支逻辑
-
 ---
 
 ### 第 8 周（4.23 - 4.29）：Agent 规划能力
@@ -287,50 +263,11 @@ graph.add_edge("agent", END)
 - 掌握 Plan-and-Execute
 - 实现 Reflection 机制
 
-**每日任务**：
-
-| 日期 | 任务 | 预计耗时 | 完成打勾 |
-|------|------|----------|----------|
-| 周一 | ReAct 论文阅读 | 2h | [ ] |
-| 周二 | ReAct 实现原理 | 2h | [ ] |
-| 周三 | Plan-and-Execute 模式 | 2h | [ ] |
-| 周四 | Reflection 机制 | 2h | [ ] |
-| 周五 | 实践：规划型 Agent | 3h | [ ] |
-| 周六 | 复杂任务分解 | 4h | [ ] |
-| 周日 | 整理笔记 + 复盘 | 2h | [ ] |
-
-**检查点**：
-- [ ] 理解思考 - 行动循环
-- [ ] 能实现任务分解
-- [ ] Agent 能自我反思
-
 ---
 
 ### 第 9 周（4.30 - 5.6）：Agent 项目实战
 
 **目标**：完成一个完整的 Agent 项目
-
-**项目选题**（三选一）：
-- [ ] 数据分析 Agent（自动读取 CSV 并分析）
-- [ ] 日程管理 Agent（自然语言创建提醒）
-- [ ] 研究助手 Agent（文献检索 + 总结）
-
-**本周任务**：
-
-| 日期 | 任务 | 预计耗时 |
-|------|------|----------|
-| 周一 | 项目设计 | 2h |
-| 周二 | Tool 开发 | 3h |
-| 周三 | Agent 逻辑实现 | 3h |
-| 周四 | 状态管理优化 | 2h |
-| 周五 | 测试与调试 | 3h |
-| 周六 | 文档与演示 | 3h |
-| 周日 | GitHub 上传 | 2h |
-
-**交付物**：
-- [ ] 完整可运行代码
-- [ ] README 文档
-- [ ] 使用示例
 
 ---
 
@@ -341,23 +278,6 @@ graph.add_edge("agent", END)
 - 实现 Agent API 封装
 - 理解异步并发处理
 
-**每日任务**：
-
-| 日期 | 任务 | 预计耗时 | 完成打勾 |
-|------|------|----------|----------|
-| 周一 | FastAPI 基础 | 2h | [ ] |
-| 周二 | 路由与请求处理 | 2h | [ ] |
-| 周三 | 异步接口实现 | 2h | [ ] |
-| 周四 | Agent 封装为 API | 3h | [ ] |
-| 周五 | WebSocket 实时对话 | 2h | [ ] |
-| 周六 | 实践：Agent 服务 | 4h | [ ] |
-| 周日 | 整理笔记 + 复盘 | 2h | [ ] |
-
-**检查点**：
-- [ ] 能部署 REST API
-- [ ] 理解请求并发处理
-- [ ] 服务稳定运行
-
 ---
 
 ### 第 11 周（5.14 - 5.20）：多 Agent 协作
@@ -366,23 +286,6 @@ graph.add_edge("agent", END)
 - 理解多 Agent 协作模式
 - 掌握 CrewAI 框架
 - 实现 Agent 通信
-
-**每日任务**：
-
-| 日期 | 任务 | 预计耗时 | 完成打勾 |
-|------|------|----------|----------|
-| 周一 | 多 Agent 模式概述 | 2h | [ ] |
-| 周二 | CrewAI 基础 | 2h | [ ] |
-| 周三 | 角色定义与任务分配 | 2h | [ ] |
-| 周四 | Agent 通信机制 | 2h | [ ] |
-| 周五 | 实践：协作 Demo | 3h | [ ] |
-| 周六 | 多 Agent 项目 | 4h | [ ] |
-| 周日 | 整理笔记 + 复盘 | 2h | [ ] |
-
-**检查点**：
-- [ ] 理解协作/竞争/分工模式
-- [ ] 能用 CrewAI 构建团队
-- [ ] 实现 Agent 间通信
 
 ---
 
@@ -393,138 +296,45 @@ graph.add_edge("agent", END)
 - 实现 MCP 兼容工具
 - 掌握 OpenAPI 规范
 
-**每日任务**：
+---
 
-| 日期 | 任务 | 预计耗时 | 完成打勾 |
-|------|------|----------|----------|
-| 周一 | MCP 协议学习 | 2h | [ ] |
-| 周二 | MCP Server 搭建 | 3h | [ ] |
-| 周三 | MCP Client 实现 | 2h | [ ] |
-| 周四 | OpenAPI 规范 | 2h | [ ] |
-| 周五 | 工具标准化 | 2h | [ ] |
-| 周六 | 实践：MCP 工具集 | 4h | [ ] |
-| 周日 | 整理笔记 + 复盘 | 2h | [ ] |
-
-**检查点**：
-- [ ] 理解 MCP 协议价值
-- [ ] 能搭建 MCP Server
-- [ ] 工具符合规范
+### 第 13-16 周：项目实战 + 求职准备
 
 ---
 
-### 第 13 周（5.28 - 6.3）：综合项目开发
+## 📈 进度追踪
 
-**目标**：整合所学，完成一个综合性项目
+### 总体进度
 
-**项目建议**：
-- 智能研究助手（RAG + Agent + 多轮对话）
-- 自动化办公系统（多 Agent 协作）
-- 知识库管理系统（RAG + Tool + API）
+| 阶段 | 时间 | 状态 |
+|------|------|------|
+| 第一阶段：基础巩固 | 第 1-2 周 | ✅ 第 1 周已完成，第 2 周需更新 |
+| 第二阶段：RAG 核心 | 第 3-6 周 | ⏳ 待开始 |
+| 第三阶段：Agent 进阶 | 第 7-10 周 | ⏳ 待开始 |
+| 第四阶段：工程化 | 第 11-14 周 | ⏳ 待开始 |
+| 第五阶段：求职准备 | 第 15-16 周 | ⏳ 待开始 |
 
-**本周任务**：
+### 本周任务（第 2 周）- 更新
 
-| 日期 | 任务 | 预计耗时 |
-|------|------|----------|
-| 周一 | 项目规划 | 2h |
-| 周二 | 核心模块开发 | 4h |
-| 周三 | 核心模块开发 | 4h |
-| 周四 | 模块整合 | 3h |
-| 周五 | 测试优化 | 3h |
-| 周六 | 文档与演示 | 4h |
-| 周日 | GitHub 整理 | 3h |
-
-**交付物**：
-- [ ] 完整项目代码
-- [ ] 详细 README
-- [ ] 部署文档
-- [ ] 演示视频
+- [x] ChatPromptTemplate 基础
+- [x] FewShotChatMessagePromptTemplate
+- [ ] Output Parser 更新到 1.0 推荐方式
+- [ ] 添加 ToolStrategy 实战
+- [ ] 整理 LangChain 1.0 笔记
 
 ---
 
-### 第 14 周（6.4 - 6.10）：简历与项目文档
+## ⚡ LangChain 1.0 面试必考点
 
-**目标**：完善简历、整理项目、准备投递
-
-**任务清单**：
-
-| 任务 | 详细说明 | 耗时 |
-|------|----------|------|
-| 简历撰写 | 突出项目经验和技术栈 | 4h |
-| 项目文档 | 3 个核心项目 README | 6h |
-| GitHub 整理 | 统一风格、添加说明 | 3h |
-| 技术博客 | 写 2-3 篇学习总结 | 4h |
-
-**简历要点**：
-- 强调 LangChain/RAG/Agent 项目经验
-- 列出具体技术栈
-- 附 GitHub 链接
+| 知识点 | 旧版本 (0.x) | 新版本 (1.0+) | 重要程度 |
+|--------|--------------|---------------|----------|
+| Agent 创建 | `create_react_agent` | `create_agent` | ⭐⭐⭐⭐⭐ |
+| 结构化输出 | `PydanticOutputParser` | `with_structured_output` | ⭐⭐⭐⭐⭐ |
+| Middleware | 无 | 新功能 | ⭐⭐⭐⭐ |
+| 包结构 | 统一包 | 拆分 + langchain-classic | ⭐⭐⭐ |
+| Python 版本 | 3.9+ | 3.10+ | ⭐⭐ |
 
 ---
 
-### 第 15 周（6.11 - 6.17）：面试准备
-
-**目标**：刷题、模拟面试、开始投递
-
-**任务清单**：
-
-| 任务 | 详细说明 | 耗时 |
-|------|----------|------|
-| 算法刷题 | LeetCode HOT 100 | 每天 5 题 |
-| 八股文 | LLM/Agent 相关面试题 | 每天 2h |
-| Mock Interview | 模拟面试练习 | 2 次 |
-| 投递准备 | 整理目标公司列表 | 2h |
-
-**面试题库**：
-- Python 基础（异步、装饰器、生成器）
-- LangChain 原理（Agent、RAG、Memory）
-- 向量数据库原理（Embedding、相似度）
-- 项目相关（技术选型、难点解决）
-
----
-
-### 第 16 周（6.18 - 6.24）：投递与面试
-
-**目标**：开始正式投递，争取面试机会
-
-**任务清单**：
-
-| 任务 | 目标 |
-|------|------|
-|  Boss 直聘 | 每日沟通 10+HR |
-| 拉勾网 | 投递 5+ 岗位 |
-| 内推 | 寻找学长学姐内推 |
-| 官网 | 关注目标公司校招官网 |
-
-**目标公司**：
-- 大厂：京东、字节、腾讯、阿里
-- AI 初创：MiniMax、月之暗面、智谱 AI
-- 其他：美团、小米、快手
-
----
-
-## 📝 每日学习时间表示例
-
-| 时间段 | 活动 | 时长 |
-|--------|------|------|
-| 8:00-9:00 | 阅读 AI 技术文章 | 1h |
-| 14:00-17:00 | 编码实践 | 3h |
-| 20:00-21:00 | 整理笔记 | 1h |
-
-**周末**：上午 + 下午各 3h 项目攻坚
-
----
-
-## 🎯 里程碑检查点
-
-| 时间 | 里程碑 | 交付物 |
-|------|--------|--------|
-| 第 2 周末 | 基础巩固完成 | 3 个 Demo |
-| 第 6 周末 | RAG 技术掌握 | RAG 项目 |
-| 第 10 周末 | Agent 进阶完成 | Agent 项目 |
-| 第 13 周末 | 综合项目完成 | 核心面试项目 |
-| 第 15 周末 | 求职准备就绪 | 简历 +GitHub |
-
----
-
-*创建时间：2026-03-05*
-*下次更新：每周一更新进度*
+*更新于：2026-03-08*
+*版本：LangChain 1.0+ 适配版*

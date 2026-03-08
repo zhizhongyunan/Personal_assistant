@@ -13,7 +13,10 @@
       "mcp__firecrawl__firecrawl_map",
       "mcp__github__search_code",
       "mcp__exa__get_code_context_exa",
-      "Bash(python:*)"
+      "Bash(python:*)",
+      "mcp__filesystem__read_multiple_files",
+      "mcp__filesystem__directory_tree",
+      "mcp__filesystem__write_file"
     ]
   }
 }

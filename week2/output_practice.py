@@ -1,26 +1,19 @@
 from langchain_core.output_parsers import StrOutputParser, PydanticOutputParser, JsonOutputParser
-from langchain.agents import create_agent
 from langchain_openai import ChatOpenAI
 from langchain.tools import tool, ToolRuntime
 from dataclasses import dataclass
 from langchain_core.prompts import ChatPromptTemplate
 from langchain.agents.structured_output import ToolStrategy
 from pydantic import BaseModel, Field
-
 class Person(BaseModel):
     name: str = Field(description="这是人物 的姓名")
     age: int = Field(description="人物的年龄")
     hobby: str = Field(description="人物的爱好")
-
-parser = PydanticOutputParser(pydantic_object=Person)
-
-parser_information = parser.get_format_instructions()
-
 prompt = ChatPromptTemplate.from_messages([
-    ("system", "{format_instruction}"),
+    ("system", "你是一个人物创造助手"),
     ("user", "{question}")
 ]
-).partial(format_instruction=parser_information)
+)
 
 model = ChatOpenAI(
     model="deepseek-chat",
@@ -28,11 +21,22 @@ model = ChatOpenAI(
     api_key="sk-eacd3a82b8e3491d888df3ef213e442e",
 )
 
-agent = prompt | model | parser
+structred_mode = model.with_structured_output(Person,method="function_calling")
 
-result = agent.invoke({"question":"给我创建一个人物"})
 
-print(result)
+agent = prompt | structred_mode
+
+try:
+    async for chunk in agent.astream({"question":"给我生成一个人物"}):
+        if hasattr(chunk, 'content_blocks') and chunk.content_blocks:
+            for block in chunk.content_blocks:
+                if block.type == "text":
+                    print(f"文本流{block.text}", end="", flush=True)
+                elif block.type =="tool_call_chunk":
+                    print(f"{}")
+except Exception as e:
+    print(f"发生异常{e}")
+
 
 # System_output ="""
 #     你是一个全能助手，给我总结文章后，请用json格式返回，字段有title，author，summary
