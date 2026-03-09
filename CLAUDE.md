@@ -298,13 +298,14 @@ for block in response.content_blocks:
 | 第四阶段：MCP 与工程化 | 第 12-15 周 | ⏳ 待开始 |
 | 第五阶段：求职准备 | 第 16-17 周 | ⏳ 待开始 |
 
-### 本周任务（第 3 周）- Middleware 专题
+### 本周任务（第 3 周）- RAG 核心技术（一）✅ 已完成评估
 
-- [ ] 理解 Middleware 6 个钩子函数
-- [ ] 实现 `HumanInTheLoopMiddleware`
-- [ ] 实现 `SummarizationMiddleware`
-- [ ] 实现自定义 Middleware（敏感词过滤）
-- [ ] 整理 Middleware 笔记
+- [x] Week 2 学习内容评估：通过 ✅
+- [ ] 理解 RAG 核心概念和工作流程
+- [ ] 掌握 Chroma 向量数据库使用
+- [ ] 掌握文本分块（Chunking）策略
+- [ ] 理解 Embedding 原理与选型
+- [ ] 完成实战：本地知识库搭建
 
 ---
 
