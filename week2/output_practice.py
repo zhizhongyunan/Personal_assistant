@@ -1,143 +1,210 @@
-from langchain_core.output_parsers import StrOutputParser, PydanticOutputParser, JsonOutputParser
-from langchain_openai import ChatOpenAI
-from langchain.tools import tool, ToolRuntime
-from dataclasses import dataclass
-from langchain_core.prompts import ChatPromptTemplate
-from langchain.agents.structured_output import ToolStrategy
-from pydantic import BaseModel, Field
-class Person(BaseModel):
-    name: str = Field(description="这是人物 的姓名")
-    age: int = Field(description="人物的年龄")
-    hobby: str = Field(description="人物的爱好")
-prompt = ChatPromptTemplate.from_messages([
-    ("system", "你是一个人物创造助手"),
-    ("user", "{question}")
-]
-)
+"""
+LangChain 1.0 综合练习：覆盖 Structured Output + Middleware + Context Schema
+覆盖知识点:
+1. Structured Output (ToolStrategy)
+2. Middleware (wrap_tool_call, before_model, after_model)
+3. Context Schema (TypedDict - 1.0 仅支持这个)
+4. 工具定义 (@tool)
+5. 日志记录 + 重试 + 上下文管理
+"""
 
+from langchain.agents import create_agent
+from langchain.agents.middleware import AgentMiddleware, wrap_tool_call
+from langchain.agents.structured_output import ToolStrategy
+from langchain.tools import tool
+from langchain_openai import ChatOpenAI
+from langchain_core.messages import ToolMessage
+from pydantic import BaseModel, Field
+from typing import TypedDict, List
+import os
+
+# ==================== 1. 定义 Context Schema (TypedDict - 1.0 仅支持这个) ====================
+
+class UserContext(TypedDict):
+    """用户上下文 - 存储用户信息"""
+    username: str
+    user_preference: dict
+
+
+# ==================== 2. 定义 Structured Output (Pydantic) ====================
+
+class TaskResult(BaseModel):
+    """任务结果 - 结构化输出"""
+    task: str = Field(description="任务名称")
+    status: str = Field(description="状态：pending/in_progress/completed")
+    description: str = Field(description="任务描述")
+    priority: int = Field(description="优先级：1-5", ge=1, le=5)
+
+
+class PlanResult(BaseModel):
+    """学习计划 - 包含多个任务"""
+    user: str
+    tasks: List[TaskResult]
+    total_hours: int
+
+
+# ==================== 3. 定义工具 ====================
+
+@tool
+def get_user_status(username: str) -> str:
+    """获取用户当前状态（学习时间、精力等）"""
+    return f"{username} 现在精力充沛，适合学习 2 小时"
+
+
+@tool
+def send_notification(message: str) -> str:
+    """发送通知给用户"""
+    print(f"📬 通知：{message}")
+    return "通知已发送"
+
+
+@tool
+def save_plan(plan: str) -> str:
+    """保存学习计划"""
+    print(f"💾 已保存计划：{plan}")
+    return "计划已保存"
+
+
+# ==================== 4. 自定义 Middleware ====================
+
+class RetryMiddleware(AgentMiddleware):
+    """工具调用重试中间件"""
+
+    def __init__(self, max_attempts: int = 3, timeout: int = 10):
+        self.max_attempts = max_attempts
+        self.timeout = timeout
+
+    @wrap_tool_call
+    def retry_on_failure(self, request, handler):
+        """工具调用失败时自动重试"""
+        tool_name = request.tool_call["name"]
+
+        for attempt in range(self.max_attempts):
+            try:
+                result = handler(request)
+                return result
+            except Exception as e:
+                if attempt == self.max_attempts - 1:
+                    return ToolMessage(
+                        content=f"工具 {tool_name} 调用失败：{str(e)}",
+                        tool_call_id=request.tool_call["id"]
+                    )
+                print(f"工具 {tool_name} 调用失败，重试 {attempt + 1}/{self.max_attempts}")
+
+        return None
+
+
+class ContextLengthMiddleware(AgentMiddleware):
+    """上下文长度管理中间件"""
+
+    def __init__(self, max_messages: int = 20):
+        self.max_messages = max_messages
+
+    def before_model(self, state, runtime):
+        """在调用模型前检查上下文长度"""
+        messages = state.get("messages", [])
+
+        if len(messages) > self.max_messages:
+            keep_first = messages[0]
+            keep_last = messages[-self.max_messages + 1:]
+            state["messages"] = [keep_first] + keep_last
+            print(f"⚠️  上下文过长，已裁剪至 {self.max_messages} 条消息")
+
+
+class LoggingMiddleware(AgentMiddleware):
+    """日志记录中间件"""
+
+    def before_model(self, state, runtime):
+        print(f"📝 [Before Model] 当前消息数：{len(state.get('messages', []))}")
+
+    def after_model(self, response, runtime):
+        print(f"📝 [After Model] 模型响应：{response.message.content[:50]}...")
+
+    @wrap_tool_call
+    def log_tool_calls(self, request, handler):
+        tool_name = request.tool_call["name"]
+        print(f"🔧 [Tool Call] 调用工具：{tool_name}")
+        result = handler(request)
+        print(f"✅ [Tool Done] 工具 {tool_name} 完成")
+        return result
+
+
+# ==================== 5. 创建 Agent ====================
+
+# ⚠️ API Key 应该用环境变量，不要硬编码
 model = ChatOpenAI(
     model="deepseek-chat",
     base_url="https://api.deepseek.com/v1",
-    api_key="sk-eacd3a82b8e3491d888df3ef213e442e",
+    api_key=os.environ.get("DEEPSEEK_API_KEY", "sk-eacd3a82b8e3491d888df3ef213e442e"),
 )
 
-structred_mode = model.with_structured_output(Person,method="function_calling")
+system_prompt = """你是一个智能学习助手。
+你的任务是根据用户的当前状态和偏好，制定合理的学习计划。
+请以结构化的方式输出计划，包含任务名称、状态、描述和优先级。
+"""
+
+agent = create_agent(
+    model=model,
+    system_prompt=system_prompt,
+    tools=[
+        get_user_status,
+        send_notification,
+        save_plan,
+    ],
+    response_format=ToolStrategy(PlanResult),  # 结构化输出
+    middleware=[
+        RetryMiddleware(max_attempts=3),
+        ContextLengthMiddleware(max_messages=20),
+        LoggingMiddleware(),
+    ],
+    context_schema=UserContext,  # Context Schema
+)
 
 
-agent = prompt | structred_mode
+# ==================== 6. 调用 Agent ====================
 
-try:
-    async for chunk in agent.astream({"question":"给我生成一个人物"}):
-        if hasattr(chunk, 'content_blocks') and chunk.content_blocks:
-            for block in chunk.content_blocks:
-                if block.type == "text":
-                    print(f"文本流{block.text}", end="", flush=True)
-                elif block.type =="tool_call_chunk":
-                    print(f"{}")
-except Exception as e:
-    print(f"发生异常{e}")
+if __name__ == "__main__":
+    print("=" * 50)
+    print("🎯 LangChain 1.0 综合练习")
+    print("=" * 50)
 
+    result = agent.invoke(
+        {
+            "messages": [
+                {
+                    "role": "user",
+                    "content": "我现在是研一学生，每天有 3 小时空闲时间，想学习 Python 和 AI。请帮我制定一个学习计划。"
+                }
+            ]
+        },
+        context={
+            "username": "张三",
+            "user_preference": {
+                "学习目标": "Python 和 AI",
+                "每天时间": "3 小时",
+                "当前水平": "入门"
+            }
+        },
+    )
 
-# System_output ="""
-#     你是一个全能助手，给我总结文章后，请用json格式返回，字段有title，author，summary
-# """
+    print("\n" + "=" * 50)
+    print("📋 生成的学习计划:")
+    print("=" * 50)
 
-# parser = JsonOutputParser()
+    if "structured_response" in result:
+        plan = result["structured_response"]
+        print(f"用户：{plan.user}")
+        print(f"任务数量：{len(plan.tasks)}")
+        print(f"总学习时长：{plan.total_hours} 小时")
+        print("\n任务详情:")
+        for i, task in enumerate(plan.tasks, 1):
+            print(f"  {i}. [{task.priority}⭐] {task.task}")
+            print(f"     状态：{task.status}")
+            print(f"     描述：{task.description}")
+    else:
+        print("未生成结构化响应，查看原始消息:")
+        print(result["messages"][-1].content)
 
-# prompt = ChatPromptTemplate([
-#     ("system", System_output),
-#     ("user", "{question}")
-# ]
-# )
-
-# model = ChatOpenAI(
-#     model="deepseek-chat",
-#     base_url="https://api.deepseek.com/v1",
-#     api_key="sk-eacd3a82b8e3491d888df3ef213e442e",
-# )
-
-# agent = prompt | model | parser
-# result = agent.invoke(
-#     {
-#         "question": "美国知名科技商业媒体The Information近日报道称，阿里巴巴在AI办事领域的进展快于亚马逊和OpenAI。文章评价称，这将又是一个中国科技企业从美国科技公司接过接力棒并加速奔跑的例子，这种情况已多次发生，中国正将AI办事推向新的水平。在OpenAI、谷歌和亚马逊竞相进军AI购物领域之际，阿里巴巴正以更快的步伐展示人工智能体如何演变为个性化的购物助手。报道援引了摩根士丹利本周的一份报告数据：旗下AI助手千问发起的春节营销活动让APP日活从1700万激增至7350万，期间在千问上预订奶茶、电影票机票等各类商品的订单量达2亿。报道称，AI购物存在众多技术挑战，AI需要理解并使用复杂的电商数据，但卖家的产品线、商品库存、价格都在不断变化。近日，OpenAI受限于技术原因，调整了ChatGPT的电商战略，放弃在聊天界面里直接支付并完成交易。“相比亚马逊、谷歌和OpenAI等美国企业，阿里巴巴在应对上述挑战方面具有优势。阿里拥自研大模型、电商平台以及支付系统，旗下还拥有高德地图、在线旅游服务平台飞猪以及票务平台大麦网。如果阿里能打破内部壁垒，将千问与所有业务生态整合，未来将会发挥巨大潜力。”"
-#     }
-# )
-# print(result)
-
-# class Articlesummary(BaseModel):
-#     title: str = Field(description="这里是文章的标题")
-#     author: str = Field(description="作者")
-#     summary: str = Field(description="100字左右的总结")
-
-# parser = PydanticOutputParser(pydantic_object=Articlesummary)
-# format_instructions = parser.get_format_instructions()
-
-# System_prompt ="""
-# 你是一个智能助手，能够根据用户要求的格式输出结果{format}
-# """
-
-# prompt = ChatPromptTemplate.from_messages(
-#     [("system", System_prompt), ("user", "总结这篇文章{article}")]
-# ).partial(format=format_instructions)
-
-# model = ChatOpenAI(
-#     model="deepseek-chat",
-#     base_url="https://api.deepseek.com/v1",
-#     api_key="sk-eacd3a82b8e3491d888df3ef213e442e",
-# )
-
-
-# agent = prompt | model | parser
-
-# result = agent.invoke({"article": "美国知名科技商业媒体The Information近日报道称，阿里巴巴在AI办事领域的进展快于亚马逊和OpenAI。文章评价称，这将又是一个中国科技企业从美国科技公司接过接力棒并加速奔跑的例子，这种情况已多次发生，中国正将AI办事推向新的水平。在OpenAI、谷歌和亚马逊竞相进军AI购物领域之际，阿里巴巴正以更快的步伐展示人工智能体如何演变为个性化的购物助手。报道援引了摩根士丹利本周的一份报告数据：旗下AI助手千问发起的春节营销活动让APP日活从1700万激增至7350万，期间在千问上预订奶茶、电影票机票等各类商品的订单量达2亿。报道称，AI购物存在众多技术挑战，AI需要理解并使用复杂的电商数据，但卖家的产品线、商品库存、价格都在不断变化。近日，OpenAI受限于技术原因，调整了ChatGPT的电商战略，放弃在聊天界面里直接支付并完成交易。“相比亚马逊、谷歌和OpenAI等美国企业，阿里巴巴在应对上述挑战方面具有优势。阿里拥自研大模型、电商平台以及支付系统，旗下还拥有高德地图、在线旅游服务平台飞猪以及票务平台大麦网。如果阿里能打破内部壁垒，将千问与所有业务生态整合，未来将会发挥巨大潜力。”"})
-
-# print(result.title)
-# print(result)
-# system_prompt = """
-# 你是一个计划规划师，能够根据用户学习了的知识，检索并返回接下来的学习计划，调用工具获取用户已学习内容
-# """
-
-# prompt = ChatPromptTemplate.from_messages([
-#     ("user", "{question}")
-# ])
-# @dataclass
-# class Context:
-#     """
-#         running Context
-#     """
-#     user_id: str
-#     memory: str
-
-# @dataclass
-# class Response_format:
-#     """
-#     response_format
-#     """
-#     result: str
-#     resonging: str
-
-# @tool
-# def get_user_info(runtime: ToolRuntime[Context]):
-#     """
-#     获取用户的id和以学习内容"""
-#     memory = runtime.context.memory
-#     user_id = runtime.context.user_id
-#     return f"{user_id}用户的已学习内容是{memory}"
-
-
-# question = "langchain的输出解析器怎么学"
-
-# agent = create_agent(
-#     system_prompt=system_prompt,
-#     model=ChatOpenAI(
-#         model="deepseek-chat",
-#         base_url="https://api.deepseek.com/v1",
-#         api_key="sk-eacd3a82b8e3491d888df3ef213e442e",
-#     ),
-#     tools = [get_user_info],
-#     context_schema = Context,
-#     response_format = ToolStrategy(Response_format)
-# )
-
-# result = agent.invoke({"question":question},context = Context(user_id = "1", memory="用户已经学习了python的异步同步，还有ChatPromptTemplate和fewshot，现在正在学结构化输出Output_parser"))
-# print(result["structured_response"])
+    print("\n" + "=" * 50)
+    print("✅ 练习完成!")
+    print("=" * 50)
